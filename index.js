@@ -65,9 +65,10 @@ const getPlayerHeight = () => {
  */
 const obstacles = (() => {
   const beatInterval = 60 / 130;
-  // The offset here means that if you jump exactly on the beat,
-  // then the obstacle passes under the peak of the jump (i.e. the jump's midpoint)
-  let beat = 12 * beatInterval + JUMP_DURATION / 2;
+  // The offset here means the obstacles come shortly after a beat.
+  // The idea is to have the player jump exactly on the musical beat,
+  // and have the obstacle move under the player immediately after.
+  let beat = 12 * beatInterval + JUMP_DURATION / 6;
   const beats = [];
   while (beat < 228) {
     beats.push(beat);
@@ -104,7 +105,7 @@ const animationFrame = () => {
     // Anything more than 1s in the past is ignored
     .filter((t) => audioElement.currentTime - t < 1)
     // Map the current time offset to an X position
-    .map((t) => ((t - audioElement.currentTime) * CANVAS_WIDTH) / 2)
+    .map((t) => (t - audioElement.currentTime) * CANVAS_WIDTH)
     .forEach((position) => {
       ctx.beginPath();
       ctx.fillStyle = "red";
@@ -122,7 +123,12 @@ const animationFrame = () => {
 
   progressElement.value = audioElement.currentTime / audioElement.duration;
 
-  // TODO handle audioElement.ended case
+  if (audioElement.ended) {
+    // TODO display some kind of end screen
+
+    // We need this to reset the game.
+    jump_start_timestamp = -Infinity;
+  }
 
   requestAnimationFrame(animationFrame);
 };

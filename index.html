@@ -18,20 +18,20 @@
       flex-direction: column;
       align-items: center;
       justify-content: space-evenly;
+      background-image: url("seamless-leaves.png");
     }
     main {
       width: min-content;
       display: grid;
     }
     svg {
-      /* (360 by 800) + 20px border on all sides */
-      height: 400px;
-      width: 840px;
+      /* (360 by 800) + 40px border on all sides */
+      height: 440px;
+      width: 880px;
       grid-column: 1;
       grid-row: 1;
     }
     canvas {
-      border: 1px solid black;
       grid-column: 1;
       grid-row: 1;
       justify-self: center;
@@ -45,9 +45,9 @@
         <filter id="filter">
           <feTurbulence type="fractalNoise" baseFrequency=".1 .01" />
           <feColorMatrix
-            values="0 0 0 .11 .69
-                    0 0 0 .09 .38
-                    0 0 0 .08 .14
+            values="0 0 0 .21 .19
+                    0 0 0 .19 .08
+                    0 0 0 .18 .07
                     0 0 0 0 1"
           />
         </filter>
@@ -61,4 +61,5 @@
       src="https://raw.githubusercontent.com/fildon/swift/main/Cardigan%20(cabin%20in%20candlelight%20version).mp3"
     ></audio>
   </body>
+  <script type="text/javascript" src="index.js"></script>
 </html>

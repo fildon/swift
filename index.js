@@ -105,7 +105,15 @@ const obstacles = [
   // and have the obstacle move under the player immediately after.
   .map((x) => x + JUMP_DURATION / 3);
 
+const isCollision = () =>
+  getPlayerHeight() < CANVAS_HEIGHT / 3 + 20 &&
+  obstacles.some(
+    (o) => Math.abs(100 - (o - audioElement.currentTime) * CANVAS_WIDTH) < 50
+  );
+
 const animationFrame = () => {
+  console.log(gameState.stage);
+
   ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
   ctx.beginPath();
@@ -115,7 +123,7 @@ const animationFrame = () => {
 
   progressElement.value = audioElement.currentTime / audioElement.duration;
 
-  if (["playing", "paused"].includes(gameState.stage)) {
+  if (["playing", "paused", "failed"].includes(gameState.stage)) {
     /**
      * We have to invert height here.
      *
@@ -127,8 +135,6 @@ const animationFrame = () => {
 
     /**
      * Draw obstacles
-     *
-     * Let's assume an obstacle takes 2000ms to traverse 800px
      */
     obstacles
       // Anything more than 2s in the future is ignored
@@ -143,6 +149,13 @@ const animationFrame = () => {
         ctx.rect(position, CANVAS_HEIGHT - 80, 20, 20);
         ctx.fill();
       });
+  }
+
+  if (gameState.stage === "playing") {
+    if (isCollision()) {
+      audioElement.pause();
+      gameState.stage = "failed";
+    }
   }
 
   if (["start", "paused"].includes(gameState.stage)) {
@@ -169,7 +182,16 @@ const animationFrame = () => {
   }
 
   if (gameState.stage === "failed") {
-    // TODO  display failure screen
+    ctx.beginPath();
+    ctx.font = "40px serif";
+    ctx.textAlign = "center";
+    ctx.fillStyle = "black";
+    ctx.fillText(
+      `FAILED! Click or tap to restart`,
+      CANVAS_WIDTH / 2,
+      CANVAS_HEIGHT / 2,
+      CANVAS_WIDTH * 0.9
+    );
   }
 
   requestAnimationFrame(animationFrame);
@@ -177,6 +199,12 @@ const animationFrame = () => {
 
 const handleMainActionInput = () => {
   if (["start", "paused", "succeeded", "failed"].includes(gameState.stage)) {
+    // If we aren't resuming from pause,
+    // then we should set the track back to the beginning
+    if (gameState.stage !== "paused") {
+      jump_start_timestamp = -Infinity;
+      audioElement.currentTime = 0;
+    }
     gameState.stage = "playing";
     return audioElement.play();
   }

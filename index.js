@@ -61,9 +61,20 @@ const getPlayerHeight = () => {
  *
  * The full song duration is 3 minutes 48 seconds = 228 seconds = 228000 ms
  *
- * TODO more interesting obstacle positioning, tied to music timing
+ * The song has 130 BPM = 60/130 seconds per beat
  */
-const obstacles = new Array(228).fill(0).map((_, i) => i + 2);
+const obstacles = (() => {
+  const beatInterval = 60 / 130;
+  // The offset here means that if you jump exactly on the beat,
+  // then the obstacle passes under the peak of the jump (i.e. the jump's midpoint)
+  let beat = 12 * beatInterval + JUMP_DURATION / 2;
+  const beats = [];
+  while (beat < 228) {
+    beats.push(beat);
+    beat += beatInterval * 2;
+  }
+  return beats;
+})();
 
 const animationFrame = () => {
   ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);

@@ -17,6 +17,9 @@ const CANVAS_HEIGHT = 360;
 const swifthead = new Image();
 swifthead.src = "swifthead.png";
 
+// The player's X position
+const PLAYER_X = 100;
+
 const audioElement = document.querySelector("audio");
 const progressElement = document.querySelector("progress");
 const canvas = document.querySelector("canvas");
@@ -60,8 +63,10 @@ const getPlayerHeight = () => {
  * Each obstacle is represented as a timestamp in the future that it will appear.
  *
  * These values were made by me! Playing along and recording when I pressed in time with the music.
+ *
+ * There are 233 beats
  */
-const obstacles = [
+const beats = [
   5.147981, 6.027845, 6.954149, 7.83365, 8.759002, 9.685011, 10.567233,
   11.538412, 12.418095, 13.345192, 14.273038, 15.154943, 16.082766, 17.103696,
   18.031111, 18.909954, 19.83517, 20.80712, 21.73619, 22.614625, 23.496167,
@@ -99,21 +104,24 @@ const obstacles = [
   208.116757, 209.087709, 210.014331, 210.941111, 211.822585, 212.794376,
   213.719614, 214.646145, 215.527891, 216.454875, 217.380453, 218.307891,
   219.187936,
-]
+];
+
+const obstacles = beats
   // We add a little offset here so that the obstacles come just after the beat.
   // The idea is to have the player jump exactly on the musical beat,
   // and have the obstacle move under the player immediately after.
-  .map((x) => x + JUMP_DURATION / 3);
+  .map((x) => x + JUMP_DURATION / 2);
 
 const isCollision = () =>
   getPlayerHeight() < CANVAS_HEIGHT / 3 + 20 &&
-  obstacles.some(
-    (o) => Math.abs(100 - (o - audioElement.currentTime) * CANVAS_WIDTH) < 50
-  );
+  obstacles
+    .map(fromTimeToPosition)
+    // We collide if we are within 50px of the player's X position
+    .some((pos) => Math.abs(PLAYER_X - pos) < 50);
+
+const fromTimeToPosition = (t) => (t - audioElement.currentTime) * CANVAS_WIDTH;
 
 const animationFrame = () => {
-  console.log(gameState.stage);
-
   ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
   ctx.beginPath();
@@ -123,15 +131,36 @@ const animationFrame = () => {
 
   progressElement.value = audioElement.currentTime / audioElement.duration;
 
+  if (["playing", "paused"]) {
+    ctx.beginPath();
+    ctx.font = "20px serif";
+    ctx.textAlign = "center";
+    ctx.fillStyle = "black";
+    ctx.fillText(
+      `${gameState.score}`,
+      CANVAS_WIDTH * 0.9,
+      CANVAS_HEIGHT * 0.1,
+      CANVAS_WIDTH * 0.9
+    );
+  }
+
   if (["playing", "paused", "failed"].includes(gameState.stage)) {
-    /**
-     * We have to invert height here.
-     *
-     * Our game data model has "height" as going up.
-     * But when drawing to canvas,
-     * higher y values correspond to the downwards direction.
-     */
-    ctx.drawImage(swifthead, 100, CANVAS_HEIGHT - getPlayerHeight(), 50, 60);
+    ctx.drawImage(
+      swifthead,
+      PLAYER_X,
+      /**
+       * We have to invert height here.
+       *
+       * Our game data model has "height" as going up.
+       * But when drawing to canvas,
+       * higher y values correspond to the downwards direction.
+       */
+      CANVAS_HEIGHT - getPlayerHeight(),
+      50,
+      60
+    );
+
+    // TODO draw perfect beat timings
 
     /**
      * Draw obstacles
@@ -142,7 +171,7 @@ const animationFrame = () => {
       // Anything more than 1s in the past is ignored
       .filter((t) => audioElement.currentTime - t < 1)
       // Map the current time offset to an X position
-      .map((t) => (t - audioElement.currentTime) * CANVAS_WIDTH)
+      .map(fromTimeToPosition)
       .forEach((position) => {
         ctx.beginPath();
         ctx.fillStyle = "red";
@@ -173,12 +202,29 @@ const animationFrame = () => {
   if (audioElement.ended && gameState.stage === "playing") {
     gameState.stage = "succeeded";
 
+    // TODO persist and display high scores somewhere?
+
     // We need this to reset the game.
     jump_start_timestamp = -Infinity;
   }
 
   if (gameState.stage === "succeeded") {
-    // TODO display success screen
+    ctx.beginPath();
+    ctx.font = "40px serif";
+    ctx.textAlign = "center";
+    ctx.fillStyle = "black";
+    ctx.fillText(
+      "SUCCESS! Click or tap to restart",
+      CANVAS_WIDTH / 2,
+      CANVAS_HEIGHT * (1 / 3),
+      CANVAS_WIDTH * 0.9
+    );
+    ctx.fillText(
+      `You scored: ${gameState.score}`,
+      CANVAS_WIDTH / 2,
+      CANVAS_HEIGHT * (2 / 3),
+      CANVAS_WIDTH * 0.9
+    );
   }
 
   if (gameState.stage === "failed") {
@@ -187,7 +233,7 @@ const animationFrame = () => {
     ctx.textAlign = "center";
     ctx.fillStyle = "black";
     ctx.fillText(
-      `FAILED! Click or tap to restart`,
+      "FAILED! Click or tap to restart",
       CANVAS_WIDTH / 2,
       CANVAS_HEIGHT / 2,
       CANVAS_WIDTH * 0.9
@@ -197,6 +243,18 @@ const animationFrame = () => {
   requestAnimationFrame(animationFrame);
 };
 
+const getScoreForJump = () => {
+  const closestBeat = beats
+    // Map to distance from current audio time
+    .map((t) => Math.abs(t - audioElement.currentTime))
+    // Sort by shortest distance
+    .sort((a, b) => a - b)[0];
+  // Reject anything super far off a beat
+  if (closestBeat > 0.2) return 0;
+  // Award up to 100 points for being close to the beat
+  return Math.ceil(500 * (0.2 - closestBeat));
+};
+
 const handleMainActionInput = () => {
   if (["start", "paused", "succeeded", "failed"].includes(gameState.stage)) {
     // If we aren't resuming from pause,
@@ -204,12 +262,14 @@ const handleMainActionInput = () => {
     if (gameState.stage !== "paused") {
       jump_start_timestamp = -Infinity;
       audioElement.currentTime = 0;
+      gameState.score = 0;
     }
     gameState.stage = "playing";
     return audioElement.play();
   }
   if (isJumping()) return;
   jump_start_timestamp = audioElement.currentTime;
+  gameState.score += getScoreForJump();
 };
 const handleEscapeInput = () => {
   if (gameState.stage === "playing") {
@@ -223,6 +283,7 @@ const gameState = {
    * start, playing, paused, succeeded, failed
    */
   stage: "start",
+  score: 0,
 };
 
 /**
@@ -242,3 +303,13 @@ audioElement.addEventListener("loadedmetadata", () => {
   );
   requestAnimationFrame(animationFrame);
 });
+
+/**
+ * TODOS
+ * - volume control
+ * - reconsider using audioElement.currentTime as the source of truth
+ * - Detect if the user's screen can't fit the canvas
+ *   - portrait mode on many mobiles won't fit for example
+ * - More interesting beat/obstacles
+ * - Bug: loadedmetadata event might never fire in some browser optimization scenarios
+ */

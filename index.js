@@ -24,7 +24,14 @@ const ctx = canvas.getContext("2d");
  * We model jumping state by remembering the last time the user started a jump.
  */
 let jump_start_timestamp = -Infinity;
-const JUMP_DURATION = 1000; // 1000ms = 1seconds
+const JUMP_DURATION = 500; // 500ms = 0.5seconds
+
+/**
+ * Each obstacle is represented as a timestamp in the future that it will appear.
+ *
+ * The full song duration is 3 minutes 48 seconds = 228 seconds = 228000 ms
+ */
+const obstacles = new Array(228).fill(0).map((_, i) => 1000 * (i + 2));
 
 /**
  * We are jumping if the most recent jump was less than a full jump duration ago.
@@ -54,7 +61,7 @@ const getPlayerHeight = () => {
   );
 };
 
-const animationFrame = () => {
+const animationFrame = (now) => {
   ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
   ctx.beginPath();
@@ -71,6 +78,25 @@ const animationFrame = () => {
    */
   ctx.drawImage(swifthead, 100, CANVAS_HEIGHT - getPlayerHeight(), 50, 60);
 
+  /**
+   * Draw obstacles
+   *
+   * Let's assume an obstacle takes 2000ms to traverse 800px
+   */
+  obstacles
+    // Anything more than 2000ms in the future is ignored
+    .filter((t) => t - now < 2000)
+    // Anything more than 1000ms in the past is ignored
+    .filter((t) => now - t < 1000)
+    // Map the current time offset to an X position
+    .map((t) => (t - now) * (CANVAS_WIDTH / 2000))
+    .forEach((position) => {
+      ctx.beginPath();
+      ctx.fillStyle = "red";
+      ctx.rect(position, CANVAS_HEIGHT - 80, 20, 20);
+      ctx.fill();
+    });
+
   requestAnimationFrame(animationFrame);
 };
 
@@ -79,8 +105,9 @@ const handleJumpInput = () => {
   jump_start_timestamp = performance.now();
 };
 document.addEventListener("click", handleJumpInput);
+const jumpKeys = new Set(["Space", "ArrowUp"]);
 document.addEventListener("keyup", (e) =>
-  e.code === "Space" ? handleJumpInput() : null
+  jumpKeys.has(e.code) ? handleJumpInput() : null
 );
 
 requestAnimationFrame(animationFrame);

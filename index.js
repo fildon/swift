@@ -113,61 +113,88 @@ const animationFrame = () => {
   ctx.rect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
   ctx.fill();
 
-  /**
-   * We have to invert height here.
-   *
-   * Our game data model has "height" as going up.
-   * But when drawing to canvas,
-   * higher y values correspond to the downwards direction.
-   */
-  ctx.drawImage(swifthead, 100, CANVAS_HEIGHT - getPlayerHeight(), 50, 60);
+  progressElement.value = audioElement.currentTime / audioElement.duration;
 
-  /**
-   * Draw obstacles
-   *
-   * Let's assume an obstacle takes 2000ms to traverse 800px
-   */
-  obstacles
-    // Anything more than 2s in the future is ignored
-    .filter((t) => t - audioElement.currentTime < 2)
-    // Anything more than 1s in the past is ignored
-    .filter((t) => audioElement.currentTime - t < 1)
-    // Map the current time offset to an X position
-    .map((t) => (t - audioElement.currentTime) * CANVAS_WIDTH)
-    .forEach((position) => {
-      ctx.beginPath();
-      ctx.fillStyle = "red";
-      ctx.rect(position, CANVAS_HEIGHT - 80, 20, 20);
-      ctx.fill();
-    });
+  if (["playing", "paused"].includes(gameState.stage)) {
+    /**
+     * We have to invert height here.
+     *
+     * Our game data model has "height" as going up.
+     * But when drawing to canvas,
+     * higher y values correspond to the downwards direction.
+     */
+    ctx.drawImage(swifthead, 100, CANVAS_HEIGHT - getPlayerHeight(), 50, 60);
 
-  if (audioElement.paused) {
+    /**
+     * Draw obstacles
+     *
+     * Let's assume an obstacle takes 2000ms to traverse 800px
+     */
+    obstacles
+      // Anything more than 2s in the future is ignored
+      .filter((t) => t - audioElement.currentTime < 2)
+      // Anything more than 1s in the past is ignored
+      .filter((t) => audioElement.currentTime - t < 1)
+      // Map the current time offset to an X position
+      .map((t) => (t - audioElement.currentTime) * CANVAS_WIDTH)
+      .forEach((position) => {
+        ctx.beginPath();
+        ctx.fillStyle = "red";
+        ctx.rect(position, CANVAS_HEIGHT - 80, 20, 20);
+        ctx.fill();
+      });
+  }
+
+  if (["start", "paused"].includes(gameState.stage)) {
     ctx.beginPath();
     ctx.font = "48px serif";
     ctx.textAlign = "center";
     ctx.fillStyle = "black";
-    ctx.fillText("Click or tap to start", CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
+    ctx.fillText(
+      `Click or tap to ${gameState.stage === "start" ? "start" : "resume"}`,
+      CANVAS_WIDTH / 2,
+      CANVAS_HEIGHT / 2
+    );
   }
 
-  progressElement.value = audioElement.currentTime / audioElement.duration;
-
-  if (audioElement.ended) {
-    // TODO display some kind of end screen
+  if (audioElement.ended && gameState.stage === "playing") {
+    gameState.stage = "succeeded";
 
     // We need this to reset the game.
     jump_start_timestamp = -Infinity;
   }
 
+  if (gameState.stage === "succeeded") {
+    // TODO display success screen
+  }
+
+  if (gameState.stage === "failed") {
+    // TODO  display failure screen
+  }
+
   requestAnimationFrame(animationFrame);
 };
 
-const handleJumpInput = () => {
-  if (audioElement.paused) return audioElement.play();
+const handleMainActionInput = () => {
+  if (["start", "paused", "succeeded", "failed"].includes(gameState.stage)) {
+    gameState.stage = "playing";
+    return audioElement.play();
+  }
   if (isJumping()) return;
   jump_start_timestamp = audioElement.currentTime;
 };
-const handlePauseInput = () => {
-  if (!audioElement.paused) audioElement.pause();
+const handleEscapeInput = () => {
+  if (gameState.stage === "playing") {
+    audioElement.pause();
+    gameState.stage = "paused";
+  }
+};
+
+const gameState = {
+  /**
+   * start, playing, paused, succeeded, failed
+   */
+  stage: "start",
 };
 
 /**
@@ -176,13 +203,13 @@ const handlePauseInput = () => {
  * audioElement.duration is `NaN` before this.
  */
 audioElement.addEventListener("loadedmetadata", () => {
-  document.addEventListener("click", handleJumpInput);
+  document.addEventListener("click", handleMainActionInput);
   const jumpKeys = new Set(["Space", "ArrowUp"]);
   document.addEventListener("keyup", (e) =>
     jumpKeys.has(e.code)
-      ? handleJumpInput()
+      ? handleMainActionInput()
       : e.code === "Escape"
-      ? handlePauseInput()
+      ? handleEscapeInput()
       : null
   );
   requestAnimationFrame(animationFrame);

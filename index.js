@@ -17,6 +17,8 @@ const CANVAS_HEIGHT = 360;
 const swifthead = new Image();
 swifthead.src = "swifthead.png";
 
+const audioElement = document.querySelector("audio");
+const progressElement = document.querySelector("progress");
 const canvas = document.querySelector("canvas");
 const ctx = canvas.getContext("2d");
 
@@ -24,20 +26,13 @@ const ctx = canvas.getContext("2d");
  * We model jumping state by remembering the last time the user started a jump.
  */
 let jump_start_timestamp = -Infinity;
-const JUMP_DURATION = 500; // 500ms = 0.5seconds
-
-/**
- * Each obstacle is represented as a timestamp in the future that it will appear.
- *
- * The full song duration is 3 minutes 48 seconds = 228 seconds = 228000 ms
- */
-const obstacles = new Array(228).fill(0).map((_, i) => 1000 * (i + 2));
-
+const JUMP_DURATION = 0.5; // 0.5seconds
 /**
  * We are jumping if the most recent jump was less than a full jump duration ago.
  */
-const isJumping = () =>
-  performance.now() - jump_start_timestamp < JUMP_DURATION;
+const isJumping = () => {
+  return audioElement.currentTime - jump_start_timestamp < JUMP_DURATION;
+};
 
 /**
  * Get the current player height.
@@ -49,7 +44,7 @@ const isJumping = () =>
 const getPlayerHeight = () => {
   if (!isJumping()) return CANVAS_HEIGHT / 3;
   // Milliseconds since the jump started
-  const timeSinceJump = performance.now() - jump_start_timestamp;
+  const timeSinceJump = audioElement.currentTime - jump_start_timestamp;
   // 0 to 1 proportion of jump completed
   const jumpDurationComplete = timeSinceJump / JUMP_DURATION;
   // The positive first half of a sine curve.
@@ -61,7 +56,16 @@ const getPlayerHeight = () => {
   );
 };
 
-const animationFrame = (now) => {
+/**
+ * Each obstacle is represented as a timestamp in the future that it will appear.
+ *
+ * The full song duration is 3 minutes 48 seconds = 228 seconds = 228000 ms
+ *
+ * TODO more interesting obstacle positioning, tied to music timing
+ */
+const obstacles = new Array(228).fill(0).map((_, i) => i + 2);
+
+const animationFrame = () => {
   ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
   ctx.beginPath();
@@ -84,12 +88,12 @@ const animationFrame = (now) => {
    * Let's assume an obstacle takes 2000ms to traverse 800px
    */
   obstacles
-    // Anything more than 2000ms in the future is ignored
-    .filter((t) => t - now < 2000)
-    // Anything more than 1000ms in the past is ignored
-    .filter((t) => now - t < 1000)
+    // Anything more than 2s in the future is ignored
+    .filter((t) => t - audioElement.currentTime < 2)
+    // Anything more than 1s in the past is ignored
+    .filter((t) => audioElement.currentTime - t < 1)
     // Map the current time offset to an X position
-    .map((t) => (t - now) * (CANVAS_WIDTH / 2000))
+    .map((t) => ((t - audioElement.currentTime) * CANVAS_WIDTH) / 2)
     .forEach((position) => {
       ctx.beginPath();
       ctx.fillStyle = "red";
@@ -97,17 +101,44 @@ const animationFrame = (now) => {
       ctx.fill();
     });
 
+  if (audioElement.paused) {
+    ctx.beginPath();
+    ctx.font = "48px serif";
+    ctx.textAlign = "center";
+    ctx.fillStyle = "black";
+    ctx.fillText("Click or tap to start", CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
+  }
+
+  progressElement.value = audioElement.currentTime / audioElement.duration;
+
+  // TODO handle audioElement.ended case
+
   requestAnimationFrame(animationFrame);
 };
 
 const handleJumpInput = () => {
+  if (audioElement.paused) audioElement.play();
   if (isJumping()) return;
-  jump_start_timestamp = performance.now();
+  jump_start_timestamp = audioElement.currentTime;
 };
-document.addEventListener("click", handleJumpInput);
-const jumpKeys = new Set(["Space", "ArrowUp"]);
-document.addEventListener("keyup", (e) =>
-  jumpKeys.has(e.code) ? handleJumpInput() : null
-);
+const handlePauseInput = () => {
+  if (!audioElement.paused) audioElement.pause();
+};
 
-requestAnimationFrame(animationFrame);
+/**
+ * We don't start anything until the song is ready.
+ *
+ * audioElement.duration is `NaN` before this.
+ */
+audioElement.addEventListener("loadedmetadata", () => {
+  document.addEventListener("click", handleJumpInput);
+  const jumpKeys = new Set(["Space", "ArrowUp"]);
+  document.addEventListener("keyup", (e) =>
+    jumpKeys.has(e.code)
+      ? handleJumpInput()
+      : e.code === "Escape"
+      ? handlePauseInput()
+      : null
+  );
+  requestAnimationFrame(animationFrame);
+});

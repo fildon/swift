@@ -298,6 +298,7 @@ const gameState = {
 
 document.addEventListener("touchstart", handleMainActionInput);
 document.addEventListener("click", handleMainActionInput);
+document.addEventListener("mousedown", handleMainActionInput);
 const jumpKeys = new Set(["Space", "ArrowUp"]);
 document.addEventListener("keyup", (e) =>
   jumpKeys.has(e.code)

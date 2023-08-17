@@ -26,12 +26,14 @@
     }
     svg {
       /* (360 by 800) + 40px border on all sides */
-      height: 440px;
-      width: 880px;
+      height: min(440px, 90vh);
+      width: min(880px, 90vw);
       grid-column: 1;
       grid-row: 1;
     }
     canvas {
+      height: min(360px, 90vh);
+      width: min(800px, 90vw);
       grid-column: 1;
       grid-row: 1;
       justify-self: center;

@@ -129,7 +129,10 @@ const animationFrame = () => {
   ctx.rect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
   ctx.fill();
 
-  progressElement.value = audioElement.currentTime / audioElement.duration;
+  // audioElement.duration is NaN before the metadata has loaded
+  progressElement.value = isNaN(audioElement.duration)
+    ? 0
+    : audioElement.currentTime / audioElement.duration;
 
   if (["playing", "paused"]) {
     ctx.beginPath();
@@ -160,7 +163,19 @@ const animationFrame = () => {
       60
     );
 
-    // TODO draw perfect beat timings
+    beats
+      // Anything more than 2s in the future is ignored
+      .filter((t) => t - audioElement.currentTime < 2)
+      // Anything more than 1s in the past is ignored
+      .filter((t) => audioElement.currentTime - t < 1)
+      // Map the current time offset to an X position
+      .map(fromTimeToPosition)
+      .forEach((position) => {
+        ctx.beginPath();
+        ctx.fillStyle = "green";
+        ctx.rect(position, CANVAS_HEIGHT - 65, 30, 5);
+        ctx.fill();
+      });
 
     /**
      * Draw obstacles
@@ -286,23 +301,17 @@ const gameState = {
   score: 0,
 };
 
-/**
- * We don't start anything until the song is ready.
- *
- * audioElement.duration is `NaN` before this.
- */
-audioElement.addEventListener("loadedmetadata", () => {
-  document.addEventListener("click", handleMainActionInput);
-  const jumpKeys = new Set(["Space", "ArrowUp"]);
-  document.addEventListener("keyup", (e) =>
-    jumpKeys.has(e.code)
-      ? handleMainActionInput()
-      : e.code === "Escape"
-      ? handleEscapeInput()
-      : null
-  );
-  requestAnimationFrame(animationFrame);
-});
+document.addEventListener("touchstart", handleMainActionInput);
+document.addEventListener("click", handleMainActionInput);
+const jumpKeys = new Set(["Space", "ArrowUp"]);
+document.addEventListener("keyup", (e) =>
+  jumpKeys.has(e.code)
+    ? handleMainActionInput()
+    : e.code === "Escape"
+    ? handleEscapeInput()
+    : null
+);
+requestAnimationFrame(animationFrame);
 
 /**
  * TODOS
@@ -311,5 +320,4 @@ audioElement.addEventListener("loadedmetadata", () => {
  * - Detect if the user's screen can't fit the canvas
  *   - portrait mode on many mobiles won't fit for example
  * - More interesting beat/obstacles
- * - Bug: loadedmetadata event might never fire in some browser optimization scenarios
  */

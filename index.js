@@ -64,7 +64,7 @@ const getPlayerHeight = () => {
  *
  * These values were made by me! Playing along and recording when I pressed in time with the music.
  *
- * There are 233 beats
+ * There are 171 beats
  */
 const beats = [
   2.286802, 3.127959, 4.057596, 4.976621, 5.87721, 6.837777, 7.73136, 8.629229,
